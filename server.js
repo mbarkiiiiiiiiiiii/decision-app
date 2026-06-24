@@ -81,25 +81,49 @@ app.post('/api/auth/signup', (req, res) => {
 });
 
 // 2. Login
-app.post('/api/auth/login', (req, res) => {
+// 2. Login (الجديد بالاتصال بـ Upstash)
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ success: false, message: 'Email and password required' });
   }
-  const user = database.users.find(u => u.email === email);
-  if (!user || user.password !== hashPassword(password)) {
-    return res.status(401).json({ success: false, message: 'Invalid email or password' });
+
+  try {
+    // كيمشي يجيب المستخدم من الدفتر السحري (Upstash)
+    const user = await redis.get(`user:${email}`);
+
+    if (!user || user.password !== hashPassword(password)) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    const token = generateToken(user.id, user.email, user.role);
+    res.json({ success: true, message: 'Login successful', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
   }
-  const token = generateToken(user.id, user.email, user.role);
-  res.json({ success: true, message: 'Login successful', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
 // 3. Save Decision
-app.post('/api/decisions', authMiddleware, (req, res) => {
-  const { decisions } = req.body; // نتقبل مصفوفة من القرارات دفعة واحدة
+// 3. Save Decision (الجديد بالاتصال بـ Upstash)
+app.post('/api/decisions', authMiddleware, async (req, res) => {
+  const { decisions } = req.body; 
   if (!decisions || !Array.isArray(decisions)) {
     return res.status(400).json({ success: false, message: 'Invalid decisions format' });
   }
+
+  try {
+    // كيجيب القرارات القديمة من Upstash
+    const oldDecisions = await redis.get('all_decisions') || [];
+    // كيزيد عليها القرارات الجديدة
+    const updatedDecisions = [...oldDecisions, ...decisions];
+    // كيحفظ اللائحة كاملة ف Upstash
+    await redis.set('all_decisions', updatedDecisions);
+
+    res.json({ success: true, message: 'Decisions saved successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error while saving decisions' });
+  }
+});
 
   decisions.forEach(d => {
     database.decisions.push({
@@ -117,12 +141,13 @@ app.post('/api/decisions', authMiddleware, (req, res) => {
 
   console.log("=== Saved Decisions f Database ===", database.decisions);
   res.status(201).json({ success: true, message: 'Decisions saved successfully' });
-});
+;
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
+
 
 module.exports = app;
 const path = require('path');
