@@ -1,25 +1,18 @@
-// ============================================
-// DECISION MANAGEMENT SYSTEM - BACKEND ENGINE
-// ============================================
 const express = require('express');
 const crypto = require('crypto');
 const cors = require('cors');
+const { Redis } = require('@upstash/redis'); // 👈 ضروري هادي
+const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const redis = new Redis({ // 👈 الربط بالمتغيرات اللي ف Vercel
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
+});
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// ============================================
-// IN-MEMORY DATABASE (No MongoDB Required)
-// ============================================
-const database = {
-  users: [],
-  decisions: [],
-  nextDecisionId: 1
-};
 
 // UTILITY FUNCTIONS
 function hashPassword(password) {
@@ -39,120 +32,49 @@ function verifyToken(token) {
   } catch (error) { return null; }
 }
 
-// MIDDLEWARE
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ success: false, message: 'No token provided' });
-  }
-  const token = authHeader.slice(7);
-  const payload = verifyToken(token);
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ success: false, message: 'No token' });
+  const payload = verifyToken(authHeader.slice(7));
   if (!payload) return res.status(401).json({ success: false, message: 'Invalid token' });
   req.user = payload;
   next();
 }
 
-// ============================================
-// API ROUTES
-// ============================================
-
 // 1. Sign Up
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
-  if (!name || !email || !password || !confirmPassword) {
-    return res.status(400).json({ success: false, message: 'All fields required' });
-  }
-  if (password !== confirmPassword) {
-    return res.status(400).json({ success: false, message: 'Passwords do not match' });
-  }
-  const existingUser = database.users.find(u => u.email === email);
-  if (existingUser) {
-    return res.status(400).json({ success: false, message: 'Email already registered' });
-  }
-
-  const user = {
-    id: database.users.length + 1,
-    name, email, password: hashPassword(password), role: 'user', createdAt: new Date()
-  };
-  database.users.push(user);
-
+  if (password !== confirmPassword) return res.status(400).json({ success: false, message: 'Mismatch' });
+  
+  const user = { id: Date.now(), name, email, password: hashPassword(password), role: 'user' };
+  await redis.set(`user:${email}`, user); // 👈 حفظ ف الدفتر
+  
   const token = generateToken(user.id, user.email, user.role);
-  res.status(201).json({ success: true, message: 'User registered successfully', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  res.status(201).json({ success: true, token, user });
 });
 
 // 2. Login
-// 2. Login (الجديد بالاتصال بـ Upstash)
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ success: false, message: 'Email and password required' });
-  }
-
   try {
-    // كيمشي يجيب المستخدم من الدفتر السحري (Upstash)
     const user = await redis.get(`user:${email}`);
-
-    if (!user || user.password !== hashPassword(password)) {
-      return res.status(401).json({ success: false, message: 'Invalid email or password' });
-    }
-
+    if (!user || user.password !== hashPassword(password)) return res.status(401).json({ success: false, message: 'Invalid' });
     const token = generateToken(user.id, user.email, user.role);
-    res.json({ success: true, message: 'Login successful', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+    res.json({ success: true, token, user });
+  } catch (err) { res.status(500).json({ success: false }); }
 });
 
 // 3. Save Decision
-// 3. Save Decision (الجديد بالاتصال بـ Upstash)
 app.post('/api/decisions', authMiddleware, async (req, res) => {
-  const { decisions } = req.body; 
-  if (!decisions || !Array.isArray(decisions)) {
-    return res.status(400).json({ success: false, message: 'Invalid decisions format' });
-  }
-
   try {
-    // كيجيب القرارات القديمة من Upstash
     const oldDecisions = await redis.get('all_decisions') || [];
-    // كيزيد عليها القرارات الجديدة
-    const updatedDecisions = [...oldDecisions, ...decisions];
-    // كيحفظ اللائحة كاملة ف Upstash
-    await redis.set('all_decisions', updatedDecisions);
-
-    res.json({ success: true, message: 'Decisions saved successfully' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Server error while saving decisions' });
-  }
+    const updated = [...oldDecisions, ...req.body.decisions];
+    await redis.set('all_decisions', updated);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false }); }
 });
 
-  decisions.forEach(d => {
-    database.decisions.push({
-      id: database.nextDecisionId++,
-      userId: req.user.userId,
-      decisionNumber: d.decisionNumber,
-      decisionDate: d.decisionDate,
-      subject: d.subject,
-      recipientEntity: d.recipient,
-      receiptDate: d.receivedDate || null,
-      remarks: d.notes || '',
-      createdAt: new Date()
-    });
-  });
-
-  console.log("=== Saved Decisions f Database ===", database.decisions);
-  res.status(201).json({ success: true, message: 'Decisions saved successfully' });
-;
-
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', message: 'Server is running' });
-});
-
+app.use(express.static(__dirname));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 module.exports = app;
-const path = require('path');
-app.use(express.static(__dirname));
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
