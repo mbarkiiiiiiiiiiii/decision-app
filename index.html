@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de Gestion des Décisions</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen relative">
+
+    <!-- 1. صفحة تسجيل الدخول وإنشاء الحساب -->
+    <div id="authContainer" class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100">
+            <h2 id="authTitle" class="text-2xl font-bold text-center text-slate-900 mb-6">Connexion</h2>
+            <form id="authForm" class="space-y-4">
+                <div id="nameGroup" class="hidden">
+                    <label id="labelName" class="block text-sm font-medium text-slate-700 mb-1">Nom Complet</label>
+                    <input type="text" id="authName" class="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label id="labelEmail" class="block text-sm font-medium text-slate-700 mb-1">Adresse Email</label>
+                    <input type="email" id="authEmail" required class="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label id="labelPassword" class="block text-sm font-medium text-slate-700 mb-1">Mot de passe</label>
+                    <input type="password" id="authPassword" required class="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div id="confirmGroup" class="hidden">
+                    <label id="labelConfirm" class="block text-sm font-medium text-slate-700 mb-1">Confirmer le mot de passe</label>
+                    <input type="password" id="authConfirm" class="w-full p-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button type="submit" id="authBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium p-3 rounded-xl transition shadow-md">Se connecter</button>
+            </form>
+            <p class="text-sm text-center text-slate-500 mt-4">
+                <span id="authToggleText">Vous n'avez pas de compte ?</span> 
+                <a id="authToggleBtn" class="text-blue-600 font-semibold cursor-pointer hover:underline">S'inscrire</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- 2. لوحة التحكم الرئيسية لتسجيل البيانات الحالي -->
+    <div id="dashboardContainer" class="hidden flex flex-col min-h-screen">
+        <header class="bg-slate-900 text-white px-6 py-4 shadow-md flex justify-between items-center">
+            <h1 id="appTitle" class="text-xl font-bold tracking-wide">Gestion des Décisions</h1>
+            <div class="flex items-center gap-4">
+                <span id="userNameDisplay" class="text-sm bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"></span>
+                <button id="openRegistreBtn" class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition shadow-sm">Voir le Registre</button>
+                <button id="langToggle" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition">العربية</button>
+                <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm transition">Déconnexion</button>
+            </div>
+        </header>
+
+        <main class="flex-1 p-6 max-w-7xl w-full mx-auto space-y-8">
+            <div class="space-y-4">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                    <h2 id="sectionTitle" class="text-lg font-bold text-slate-800">Enregistrer de nouvelles décisions</h2>
+                    <button type="button" id="addRowBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2 rounded-xl transition shadow-sm">+ Ajouter une ligne</button>
+                </div>
+
+                <form id="decisionForm" class="space-y-4">
+                    <div class="bg-white rounded-xl shadow-md border border-slate-100 overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[900px]">
+                            <thead>
+                                <tr class="bg-slate-800 text-white text-sm uppercase tracking-wider">
+                                    <th id="thNum" class="p-4 rounded-tl-xl">N° Décision</th>
+                                    <th id="thDate" class="p-4">Date Décision</th>
+                                    <th id="thSubject" class="p-4">Objet du décret</th>
+                                    <th id="thRecipient" class="p-4">Entité destinataire</th>
+                                    <th id="thReceived" class="p-4">Date Réception</th>
+                                    <th id="thNotes" class="p-4 rounded-tr-xl">Remarques</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-slate-100 text-sm">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="p-3"><input type="text" required class="w-full p-2 border border-slate-200 rounded-lg bg-white" placeholder="Ex: 124/2026"></td>
+                                    <td class="p-3"><input type="date" required class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                                    <td class="p-3"><textarea required rows="2" class="w-full p-2 border border-slate-200 rounded-lg bg-white resize-y" placeholder="Objet..."></textarea></td>
+                                    <td class="p-3"><input type="text" required class="w-full p-2 border border-slate-200 rounded-lg bg-white" placeholder="Destinataire"></td>
+                                    <td class="p-3"><input type="date" class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                                    <td class="p-3"><input type="text" class="w-full p-2 border border-slate-200 rounded-lg bg-white" placeholder="..."></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="flex justify-end gap-3 bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                        <button type="button" id="exportCurrentWordBtn" class="bg-blue-800 hover:bg-blue-900 text-white font-medium px-5 py-2.5 rounded-xl transition shadow-sm">Télécharger Word (Actuel)</button>
+                        <button type="button" id="exportCurrentExcelBtn" class="bg-emerald-700 hover:bg-emerald-800 text-white font-medium px-5 py-2.5 rounded-xl transition shadow-sm">Télécharger Excel (Actuel)</button>
+                        <button type="submit" id="saveBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl transition shadow-md">Enregistrer & Sauvegarder</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- 3. الصفحة الثانية المنبثقة: سجل الجداول المفصولة والمحفوظة -->
+    <div id="registreModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100">
+            <div class="bg-slate-800 text-white p-5 flex justify-between items-center w-full">
+                <h2 id="viewTitle" class="text-xl font-bold">Registre des Décisions</h2>
+                <button id="closeRegistreBtn" class="text-slate-400 hover:text-white text-2xl font-bold px-2 transition">&times;</button>
+            </div>
+            
+            <!-- هنا الحاوية اللي غاتصاوب فيها جداول منفصلة أوتوماتيكياً -->
+            <div id="registreTablesContainer" class="p-6 overflow-y-auto flex-1 bg-slate-50/50 space-y-8">
+                <!-- الجداول المنفصلة تظهر هنا ديناميكياً -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+        let currentLang = 'fr';
+        let isLoginMode = true;
+        let token = localStorage.getItem('token');
+        let userData = JSON.parse(localStorage.getItem('user'));
+        
+        // تعديل التخزين ليكون عبارة عن مصفوفة من المجموعات المنفصلة (Array of Sessions)
+        let groupSavedData = JSON.parse(localStorage.getItem('my_grouped_decisions')) || [];
+
+        const translations = {
+            fr: {
+                authTitle: "Connexion", authBtn: "Se connecter", toggleText: "Vous n'avez pas de compte ?", toggleBtn: "S'inscrire",
+                appTitle: "Gestion des Décisions", logout: "Déconnexion", sectionTitle: "Enregistrer de nouvelles décisions",
+                addRow: "+ Ajouter une ligne", thNum: "N° Décision", thDate: "Date Décision", thSubject: "Objet du décret",
+                thRecipient: "Entité destinataire", thReceived: "Date Réception", thNotes: "Remarques",
+                exportExcel: "Télécharger Excel (Actuel)", exportWord: "Télécharger Word (Actuel)", save: "Enregistrer & Sauvegarder", langText: "العربية",
+                viewTitle: "Registre des Décisions", openRegistre: "Voir le Registre"
+            },
+            ar: {
+                authTitle: "تسجيل الدخول", authBtn: "دخول", toggleText: "ليس لديك حساب؟", toggleBtn: "إنشاء حساب",
+                appTitle: "نظام إدارة القرارات", logout: "خروج", sectionTitle: "تسجيل قرارات جديدة في النظام",
+                addRow: "+ إضافة سطر جديد", thNum: "رقم القرار", thDate: "تاريخ القرار", thSubject: "موضوع القرار",
+                thRecipient: "الجهة المرسل إليها", thReceived: "تاريخ التسلم", thNotes: "ملاحظات",
+                exportExcel: "تحميل ملف Excel (الحالي)", exportWord: "تحميل ملف Word (الحالي)", save: "حفظ البيانات", langText: "Français",
+                viewTitle: "سجل القرارات المحفوظة", openRegistre: "عرض السجل"
+            }
+        };
+
+        function checkAuth() {
+            if (token && userData) {
+                document.getElementById('authContainer').classList.add('hidden');
+                document.getElementById('dashboardContainer').classList.remove('hidden');
+                document.getElementById('userNameDisplay').textContent = userData.name;
+                updateLanguageUI();
+                renderGroupedTables();
+            } else {
+                document.getElementById('authContainer').classList.remove('hidden');
+                document.getElementById('dashboardContainer').classList.add('hidden');
+            }
+        }
+
+        document.getElementById('openRegistreBtn').addEventListener('click', () => { document.getElementById('registreModal').classList.remove('hidden'); });
+        document.getElementById('closeRegistreBtn').addEventListener('click', () => { document.getElementById('registreModal').classList.add('hidden'); });
+
+        // دالة سحرية لإنشاء وعرض كل مجموعة حفظ ف جدول مستقل بوحدو ناضي
+        function renderGroupedTables() {
+            const container = document.getElementById('registreTablesContainer');
+            container.innerHTML = '';
+            
+            if(groupSavedData.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-slate-400 bg-white rounded-xl border">Aucun enregistrement trouvé / لا توجد مجموعات محفوظة</div>`;
+                return;
+            }
+
+            const t = translations[currentLang];
+
+            // كنقراو المجموعات من الأحدث إلى الأقدم
+            groupSavedData.slice().reverse().forEach((group, index) => {
+                const actualIndex = groupSavedData.length - 1 - index;
+                const groupDiv = document.createElement('div');
+                groupDiv.className = "bg-white p-5 rounded-xl shadow-md border border-slate-200 space-y-3";
+                
+                // العنوان المخصص لكل جدول مع أزرار التحميل الخاصة بيه بوحدو
+                groupDiv.innerHTML = `
+                    <div class="flex flex-wrap justify-between items-center bg-slate-50 p-3 rounded-lg border-l-4 border-blue-600 gap-2" dir="${currentLang === 'ar' ? 'rtl' : 'ltr'}">
+                        <span class="font-bold text-slate-700 text-sm">
+                            📁 ${currentLang === 'ar' ? 'المجموعة رقم' : 'Groupe N°'} ${actualIndex + 1} — 📅 ${group.date}
+                        </span>
+                        <div class="flex gap-2">
+                            <button onclick="downloadGroupExcel(${actualIndex})" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium">Excel</button>
+                            <button onclick="downloadGroupWord(${actualIndex})" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg transition font-medium">Word</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm border-collapse" dir="${currentLang === 'ar' ? 'rtl' : 'ltr'}">
+                            <thead>
+                                <tr class="bg-slate-800 text-white text-xs uppercase">
+                                    <th class="p-3 text-right">${t.thNum}</th>
+                                    <th class="p-3 text-right">${t.thDate}</th>
+                                    <th class="p-3 text-right">${t.thSubject}</th>
+                                    <th class="p-3 text-right">${t.thRecipient}</th>
+                                    <th class="p-3 text-right">${t.thReceived}</th>
+                                    <th class="p-3 text-right">${t.thNotes}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-600">
+                                ${group.items.map(item => `
+                                    <tr class="hover:bg-slate-50/50">
+                                        <td class="p-3 font-semibold text-slate-900">${item.decisionNumber}</td>
+                                        <td class="p-3">${item.decisionDate}</td>
+                                        <td class="p-3 whitespace-pre-line">${item.subject}</td>
+                                        <td class="p-3">${item.recipient}</td>
+                                        <td class="p-3">${item.receivedDate || '-'}</td>
+                                        <td class="p-3 text-slate-400">${item.notes || '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                container.appendChild(groupDiv);
+            });
+        }
+
+        document.getElementById('authToggleBtn').addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            document.getElementById('nameGroup').classList.toggle('hidden', isLoginMode);
+            document.getElementById('confirmGroup').classList.toggle('hidden', isLoginMode);
+            updateLanguageUI();
+        });
+
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            const name = document.getElementById('authName').value;
+            const confirmPassword = document.getElementById('authConfirm').value;
+
+            const endpoint = isLoginMode ? '/auth/login' : '/auth/signup';
+            const bodyData = isLoginMode ? { email, password } : { name, email, password, confirmPassword };
+
+            try {
+                const res = await fetch(API_URL + endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyData)
+                });
+                const result = await res.json();
+                if (result.success) {
+                    token = result.token; userData = result.user;
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('user', JSON.stringify(userData));
+                    checkAuth();
+                } else { alert(result.message); }
+            } catch (err) { alert("Erreur de connexion au serveur backend."); }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => { localStorage.clear(); token = null; userData = null; groupSavedData = []; checkAuth(); });
+
+        document.getElementById('addRowBtn').addEventListener('click', () => {
+            const tbody = document.getElementById('tableBody');
+            const newRow = document.createElement('tr');
+            newRow.className = "hover:bg-slate-50 transition border-t border-slate-100";
+            newRow.innerHTML = `
+                <td class="p-3"><input type="text" required class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                <td class="p-3"><input type="date" required class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                <td class="p-3"><textarea required rows="2" class="w-full p-2 border border-slate-200 rounded-lg bg-white resize-y"></textarea></td>
+                <td class="p-3"><input type="text" required class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                <td class="p-3"><input type="date" class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                <td class="p-3"><input type="text" class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+            `;
+            tbody.appendChild(newRow);
+        });
+
+        function getTableData() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            const data = [];
+            rows.forEach(row => {
+                const inputs = row.querySelectorAll('input, textarea');
+                if(inputs.length > 0 && inputs[0].value !== '') {
+                    data.push({
+                        decisionNumber: inputs[0].value,
+                        decisionDate: inputs[1].value,
+                        subject: inputs[2].value,
+                        recipient: inputs[3].value,
+                        receivedDate: inputs[4].value,
+                        notes: inputs[5].value
+                    });
+                }
+            });
+            return data;
+        }
+
+        // إرسال البيانات وحفظها كمجموعة مستقلة بذاتها ولها وقت وتاريخ
+        document.getElementById('decisionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const decisionsData = getTableData();
+            if(decisionsData.length === 0) return;
+
+            try {
+                const res = await fetch(`${API_URL}/decisions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ decisions: decisionsData })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert(currentLang === 'fr' ? "Enregistré avec succès !" : "تم حفظ البيانات بنجاح!");
+                    
+                    // صناعة حزمة تخزين تحتوي على طابلو منفصل مدمج مع تاريخ اللحظة بالدقيقة
+                    const now = new Date();
+                    const formattedTimestamp = `${now.toLocaleDateString()} à ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                    
+                    groupSavedData.push({
+                        date: formattedTimestamp,
+                        items: decisionsData
+                    });
+                    
+                    localStorage.setItem('my_grouped_decisions', JSON.stringify(groupSavedData));
+                    renderGroupedTables();
+                    
+                    // إعادة تنظيف خانات الإدخال بالكامل
+                    const tbody = document.getElementById('tableBody');
+                    tbody.innerHTML = `
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-3"><input type="text" required class="w-full p-2 border border-slate-200 rounded-lg bg-white" placeholder="Ex: 124/2026"></td>
+                            <td class="p-3"><input type="date" required class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                            <td class="p-3"><textarea required rows="2" class="w-full p-2 border border-slate-200 rounded-lg bg-white resize-y" placeholder="Objet..."></textarea></td>
+                            <td class="p-3"><input type="text" required class="w-full p-2 border border-slate-200 rounded-lg bg-white" placeholder="Destinataire"></td>
+                            <td class="p-3"><input type="date" class="w-full p-2 border border-slate-200 rounded-lg bg-white"></td>
+                            <td class="p-3"><input type="text" class="w-full p-2 border border-slate-200 rounded-lg bg-white" placeholder="..."></td>
+                        </tr>
+                    `;
+                    document.getElementById('decisionForm').reset();
+                } else { alert(result.message); }
+            } catch (err) { alert("Erreur: Le backend est offline."); }
+        });
+
+        // دوال المولدات العامة لتجهيز الـ Excel والـ Word بدقة
+        function generateExcelBlob(data, fileName) {
+            const t = translations[currentLang];
+            const worksheetData = data.map(item => ({
+                [t.thNum]: item.decisionNumber, [t.thDate]: item.decisionDate,
+                [t.thSubject]: item.subject, [t.thRecipient]: item.recipient,
+                [t.thReceived]: item.receivedDate, [t.thNotes]: item.notes
+            }));
+            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Decisions");
+            XLSX.writeFile(workbook, `${fileName}.xlsx`);
+        }
+
+        function generateWordBlob(data, title) {
+            const t = translations[currentLang];
+            let wordHTML = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head><meta charset="utf-8">
+                <style>
+                    table { border-collapse: collapse; width: 100%; font-family: 'Cairo', 'Arial', sans-serif; }
+                    th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: ${currentLang === 'ar' ? 'right' : 'left'}; }
+                    th { background-color: #1e293b; color: white; font-weight: bold; }
+                    h1 { text-align: center; color: #1e3a8a; font-family: sans-serif; }
+                </style>
+            </head>
+            <body dir="${currentLang === 'ar' ? 'rtl' : 'ltr'}">
+                <h1>${title}</h1>
+                <table>
+                    <thead><tr><th>${t.thNum}</th><th>${t.thDate}</th><th>${t.thSubject}</th><th>${t.thRecipient}</th><th>${t.thReceived}</th><th>${t.thNotes}</th></tr></thead>
+                    <tbody>
+            `;
+            data.forEach(item => {
+                wordHTML += `<tr><td style="font-weight:bold;">${item.decisionNumber}</td><td>${item.decisionDate}</td><td style="white-space: pre-line;">${item.subject}</td><td>${item.recipient}</td><td>${item.receivedDate || ''}</td><td>${item.notes || ''}</td></tr>`;
+            });
+            wordHTML += `</tbody></table></body></html>`;
+
+            const blob = new Blob(['\ufeff' + wordHTML], { type: 'application/msword' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.doc`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // أزرار الحصة الحالية ف الصفحة الأولى
+        document.getElementById('exportCurrentExcelBtn').addEventListener('click', () => { generateExcelBlob(getTableData(), "Decisions_Actuelles"); });
+        document.getElementById('exportCurrentWordBtn').addEventListener('click', () => { generateWordBlob(getTableData(), currentLang === 'fr' ? "Registre des Decisions Actuelles" : "سجل القرارات الحالية"); });
+        
+        // دوال التحميل المخصصة لكل مجموعة مستقلة من داخل السجل
+        function downloadGroupExcel(index) {
+            const group = groupSavedData[index];
+            generateExcelBlob(group.items, `Decisions_Groupe_${index + 1}`);
+        }
+        
+        function downloadGroupWord(index) {
+            const group = groupSavedData[index];
+            generateWordBlob(group.items, currentLang === 'fr' ? `Decisions Groupe ${index + 1}` : `مجموعة القرارات رقم ${index + 1}`);
+        }
+
+        document.getElementById('langToggle').addEventListener('click', () => { currentLang = currentLang === 'fr' ? 'ar' : 'fr'; updateLanguageUI(); });
+
+        function updateLanguageUI() {
+            const t = translations[currentLang];
+            document.documentElement.lang = currentLang;
+            
+            if (currentLang === 'ar') {
+                document.documentElement.dir = 'rtl';
+            } else {
+                document.documentElement.dir = 'ltr';
+            }
+
+            document.getElementById('langToggle').textContent = t.langText;
+            document.getElementById('appTitle').textContent = t.appTitle;
+            document.getElementById('logoutBtn').textContent = t.logout;
+            document.getElementById('sectionTitle').textContent = t.sectionTitle;
+            document.getElementById('addRowBtn').textContent = t.addRow;
+            document.getElementById('openRegistreBtn').textContent = t.openRegistre;
+            document.getElementById('thNum').textContent = t.thNum;
+            document.getElementById('thDate').textContent = t.thDate;
+            document.getElementById('thSubject').textContent = t.thSubject;
+            document.getElementById('thRecipient').textContent = t.thRecipient;
+            document.getElementById('thReceived').textContent = t.thReceived;
+            document.getElementById('thNotes').textContent = t.thNotes;
+            document.getElementById('exportCurrentExcelBtn').textContent = t.exportExcel;
+            document.getElementById('exportCurrentWordBtn').textContent = t.exportWord;
+            document.getElementById('saveBtn').textContent = t.save;
+            document.getElementById('viewTitle').textContent = t.viewTitle;
+            renderGroupedTables();
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>
