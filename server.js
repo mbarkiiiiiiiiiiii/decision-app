@@ -87,4 +87,4 @@ app.delete('/api/decisions/:id', (req, res) => {
   // كنقلبو على السطر اللي عندو هاد الـ id وكنمسحوه
   database.decisions = database.decisions.filter(d => d.id !== id);
   res.json({ success: true, message: "تم الحذف بنجاح" });
-});
+}); 
