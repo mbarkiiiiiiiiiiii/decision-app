@@ -1,11 +1,13 @@
 const express = require('express');
 const crypto = require('crypto');
 const cors = require('cors');
-const { Redis } = require('@upstash/redis'); // 👈 ضروري هادي
+const { Redis } = require('@upstash/redis');
 const path = require('path');
 
 const app = express();
-const redis = new Redis({ // 👈 الربط بالمتغيرات اللي ف Vercel
+
+// الربط بـ Upstash
+const redis = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
@@ -47,7 +49,7 @@ app.post('/api/auth/signup', async (req, res) => {
   if (password !== confirmPassword) return res.status(400).json({ success: false, message: 'Mismatch' });
   
   const user = { id: Date.now(), name, email, password: hashPassword(password), role: 'user' };
-  await redis.set(`user:${email}`, user); // 👈 حفظ ف الدفتر
+  await redis.set(`user:${email}`, user);
   
   const token = generateToken(user.id, user.email, user.role);
   res.status(201).json({ success: true, token, user });
@@ -64,22 +66,19 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 3. Save Decision (مربوط بـ ID ديال المستخدم)
+// 3. Save Decision
 app.post('/api/decisions', authMiddleware, async (req, res) => {
-  const userId = req.user.userId; // كنجيبو الـ ID من الـ Token اللي ديجا تحققنا منو
-  
+  const userId = req.user.userId;
   try {
-    // 👈 كنجيبو القرارات الخاصة بهاد المستخدم بوحدو
     const oldDecisions = await redis.get(`decisions:${userId}`) || [];
-    
-    // كنزيدو عليهم الجداد
     const updated = [...oldDecisions, ...req.body.decisions];
-    
-    // 👈 كنحفظوهم ف بلاصة خاصة بهاد المستخدم
     await redis.set(`decisions:${userId}`, updated);
-    
     res.json({ success: true, message: 'Saved!' });
-  } catch (err) { 
-    res.status(500).json({ success: false, error: err.message }); 
-  }
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
+
+// Serve Static Files
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+
+module.exports = app;
