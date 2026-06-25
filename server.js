@@ -89,3 +89,4 @@ app.post('/api/decisions', authMiddleware, async (req, res) => {
 
 // Vercel يحتاج أن نصدر التطبيق (Export)
 module.exports = app;
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
