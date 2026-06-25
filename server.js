@@ -64,17 +64,22 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// 3. Save Decision
+// 3. Save Decision (مربوط بـ ID ديال المستخدم)
 app.post('/api/decisions', authMiddleware, async (req, res) => {
+  const userId = req.user.userId; // كنجيبو الـ ID من الـ Token اللي ديجا تحققنا منو
+  
   try {
-    const oldDecisions = await redis.get('all_decisions') || [];
+    // 👈 كنجيبو القرارات الخاصة بهاد المستخدم بوحدو
+    const oldDecisions = await redis.get(`decisions:${userId}`) || [];
+    
+    // كنزيدو عليهم الجداد
     const updated = [...oldDecisions, ...req.body.decisions];
-    await redis.set('all_decisions', updated);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ success: false }); }
+    
+    // 👈 كنحفظوهم ف بلاصة خاصة بهاد المستخدم
+    await redis.set(`decisions:${userId}`, updated);
+    
+    res.json({ success: true, message: 'Saved!' });
+  } catch (err) { 
+    res.status(500).json({ success: false, error: err.message }); 
+  }
 });
-
-app.use(express.static(__dirname));
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-module.exports = app;
