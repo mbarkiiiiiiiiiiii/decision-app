@@ -1,35 +1,30 @@
 const express = require('express');
-const app = express();
+const cors = require('cors');
 const path = require('path');
 
+const app = express();
+app.use(cors());
 app.use(express.json());
 
-// هادي هي الداتابيس ديالنا، مخبية غير ف الرام (الذاكرة)
-let database = {
-  users: [],
-  decisions: []
-};
+// البيانات في الذاكرة (مؤقتة)
+let database = { users: [], decisions: [] };
 
-// 1. تسجيل جديد
 app.post('/api/auth/signup', (req, res) => {
-  const { name, email, password } = req.body;
-  database.users.push({ name, email, password });
-  res.json({ success: true, message: "تم التسجيل" });
+    database.users.push(req.body);
+    res.json({ success: true });
 });
 
-// 2. حفظ القرارات
 app.post('/api/decisions', (req, res) => {
-  database.decisions.push(req.body);
-  res.json({ success: true, message: "تم الحفظ" });
+    database.decisions.push(...req.body.decisions);
+    res.json({ success: true });
 });
 
-// 3. قراءة القرارات
 app.get('/api/decisions', (req, res) => {
-  res.json(database.decisions);
+    res.json(database.decisions);
 });
 
-// تشغيل الـ Frontend
-app.use(express.static(__dirname));
+// هذا السطر مهم جداً لـ Vercel
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 module.exports = app;
