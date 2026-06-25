@@ -1,15 +1,15 @@
 const express = require('express');
 const crypto = require('crypto');
 const cors = require('cors');
-const { Redis } = require('@upstash/redis');
+const { Redis } = require('@upstash/redis'); // 👈 المكتبة الصحيحة للربط
 const path = require('path');
 
 const app = express();
 
-// الربط بـ Upstash
+// الربط بالمتغيرات اللي ف Vercel (تأكدي من هاد الأسماء ف الإعدادات)
 const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
+  url: process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN,
 });
 
 app.use(cors());
@@ -49,7 +49,7 @@ app.post('/api/auth/signup', async (req, res) => {
   if (password !== confirmPassword) return res.status(400).json({ success: false, message: 'Mismatch' });
   
   const user = { id: Date.now(), name, email, password: hashPassword(password), role: 'user' };
-  await redis.set(`user:${email}`, user);
+  await redis.set(`user:${email}`, user); // 👈 حفظ ف الدفتر السحري
   
   const token = generateToken(user.id, user.email, user.role);
   res.status(201).json({ success: true, token, user });
@@ -68,17 +68,17 @@ app.post('/api/auth/login', async (req, res) => {
 
 // 3. Save Decision
 app.post('/api/decisions', authMiddleware, async (req, res) => {
-  const userId = req.user.userId;
   try {
-    const oldDecisions = await redis.get(`decisions:${userId}`) || [];
+    const oldDecisions = await redis.get('all_decisions') || [];
     const updated = [...oldDecisions, ...req.body.decisions];
-    await redis.set(`decisions:${userId}`, updated);
-    res.json({ success: true, message: 'Saved!' });
-  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+    await redis.set('all_decisions', updated);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false }); }
 });
 
-// Serve Static Files
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+// Serve Frontend Files
+app.use(express.static(__dirname));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
+// 👈 هادي ضرورية بزاف لـ Vercel باش يخدم السيرفر
 module.exports = app;
